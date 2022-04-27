@@ -118,16 +118,21 @@ class ShuffleNetV2(nn.Module):
             self.in_channels = out_channels
         return nn.Sequential(*layers)
 
-    def forward(self, x):
-        out = F.relu(self.bn1(self.conv1(x)))
+    def register_backward_hook(self, x, hook=None):
+        if hook is not None:
+            x.register_hook(hook)
+        return x
+
+    def forward(self, x, hook=None):
+        out = self.register_backward_hook(F.relu(self.bn1(self.conv1(x))), hook)
         # out = F.max_pool2d(out, 3, stride=2, padding=1)
-        out = self.layer1(out)
-        out = self.layer2(out)
-        out = self.layer3(out)
-        out = F.relu(self.bn2(self.conv2(out)))
-        out = F.avg_pool2d(out, 4)
-        out = out.view(out.size(0), -1)
-        out = self.linear(out)
+        out = self.register_backward_hook(self.layer1(out), hook)
+        out = self.register_backward_hook(self.layer2(out), hook)
+        out = self.register_backward_hook(self.layer3(out), hook)
+        out = self.register_backward_hook(F.relu(self.bn2(self.conv2(out))), hook)
+        out = self.register_backward_hook(F.avg_pool2d(out, 4), hook)
+        out = self.register_backward_hook(out.view(out.size(0), -1), hook)
+        out = self.register_backward_hook(self.linear(out), hook)
         return out
 
 
